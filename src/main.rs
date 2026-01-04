@@ -33,7 +33,7 @@ struct Cli {
 
     /// タグデータベースのパスを指定 (環境変数 SMART_TAGS_DB でも設定可)
     #[arg(
-        long, 
+        long,
         value_name = "DB_PATH", 
         env = "SMART_TAGS_DB",      // 環境変数を読みに行く
         default_value = "tags_db.json" // デフォルトはカレントディレクトリ
@@ -72,7 +72,10 @@ fn main() -> Result<()> {
     // 3. Markdownファイルを更新
     update_markdown(md_path, &resolved_tags)?;
 
-    println!("✅ Successfully added tags to {:?}: {:?}", md_path, resolved_tags);
+    println!(
+        "✅ Successfully added tags to {:?}: {:?}",
+        md_path, resolved_tags
+    );
     Ok(())
 }
 
@@ -89,7 +92,10 @@ fn resolve_tag(input: &str, config: &mut TagConfig) -> Result<(String, bool)> {
         }
     }
     // B. あいまい検索
-    let suggestions: Vec<(usize, usize)> = config.tags.iter().enumerate()
+    let suggestions: Vec<(usize, usize)> = config
+        .tags
+        .iter()
+        .enumerate()
         .map(|(i, t)| (i, levenshtein(&t.name, input)))
         .filter(|(_, dist)| *dist <= 3)
         .collect();
@@ -103,7 +109,10 @@ fn resolve_tag(input: &str, config: &mut TagConfig) -> Result<(String, bool)> {
         }
         let best_match_idx = suggestions[0].0;
         let best_match_name = config.tags[best_match_idx].name.clone();
-        selections.push(format!("Register '{}' as alias for '{}'", input, best_match_name));
+        selections.push(format!(
+            "Register '{}' as alias for '{}'",
+            input, best_match_name
+        ));
         selections.push(format!("Create new tag '{}'", input));
 
         let selection = Select::new()
@@ -144,8 +153,8 @@ fn load_config(path: &Path) -> Result<TagConfig> {
     if !path.exists() {
         return Ok(TagConfig::default());
     }
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read DB file: {:?}", path))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read DB file: {:?}", path))?;
     let config = serde_json::from_str(&content).unwrap_or_default();
     Ok(config)
 }
@@ -159,23 +168,22 @@ fn save_config(path: &Path, config: &TagConfig) -> Result<()> {
     }
 
     let content = serde_json::to_string_pretty(config)?;
-    fs::write(path, content)
-        .with_context(|| format!("Failed to write DB file: {:?}", path))?;
+    fs::write(path, content).with_context(|| format!("Failed to write DB file: {:?}", path))?;
     Ok(())
 }
 
 // --- Markdown更新 (変更なし) ---
 fn update_markdown(path: &PathBuf, new_tags: &[String]) -> Result<()> {
     // 省略 (前回のコードと同じ)
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {:?}", path))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {:?}", path))?;
 
     let re = Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)").unwrap();
-    
+
     let (mut yaml_val, body) = if let Some(caps) = re.captures(&content) {
         let yaml_str = caps.get(1).unwrap().as_str();
         let body_str = caps.get(2).unwrap().as_str();
-        let val: Value = serde_yaml::from_str(yaml_str).unwrap_or(Value::Mapping(serde_yaml::Mapping::new()));
+        let val: Value =
+            serde_yaml::from_str(yaml_str).unwrap_or(Value::Mapping(serde_yaml::Mapping::new()));
         (val, body_str.to_string())
     } else {
         (Value::Mapping(serde_yaml::Mapping::new()), content)
@@ -183,7 +191,7 @@ fn update_markdown(path: &PathBuf, new_tags: &[String]) -> Result<()> {
 
     let mapping = yaml_val.as_mapping_mut().context("Invalid Front Matter")?;
     let tags_key = Value::String("tags".to_string());
-    
+
     if !mapping.contains_key(&tags_key) {
         mapping.insert(tags_key.clone(), Value::Sequence(Vec::new()));
     }
@@ -196,7 +204,8 @@ fn update_markdown(path: &PathBuf, new_tags: &[String]) -> Result<()> {
     }
 
     if let Some(seq) = tags_val.as_sequence_mut() {
-        let mut current_strings: Vec<String> = seq.iter()
+        let mut current_strings: Vec<String> = seq
+            .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
 
