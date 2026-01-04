@@ -1,0 +1,53 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux, Windows, macOS の3環境で並列にテストを実行します
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    # runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Rustツールチェーンのセットアップ（clippyとrustfmtも含める）
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    # ビルドキャッシュの有効化（2回目以降のビルドが劇的に速くなります）
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    # コードフォーマットのチェック（Linuxのみで実行して時短）
+    - name: Check formatting
+      if: matrix.os == 'ubuntu-latest'
+      run: cargo fmt --all -- --check
+
+    # Lintチェック（バグになりそうな書き方を指摘）
+    - name: Run Clippy
+      run: cargo clippy -- -D warnings
+
+    # テストの実行
+    - name: Run tests
+      run: cargo test --verbose
+      
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose
