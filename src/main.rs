@@ -8,10 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use strsim::levenshtein;
 
-// --- 定数: タグ辞書ファイルのパス (簡易的にカレントディレクトリとしています) ---
-const DB_FILENAME: &str = "tags_db.json";
-
-// --- データ構造: JSON辞書 ---
+// --- データ構造 (変更なし) ---
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct TagEntry {
     name: String,
@@ -24,7 +21,7 @@ struct TagConfig {
     tags: Vec<TagEntry>,
 }
 
-// --- CLI引数定義 ---
+// --- CLI引数定義 (ここを変更) ---
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Cli {
@@ -33,18 +30,29 @@ struct Cli {
 
     #[arg(value_name = "TAGS", num_args = 1..)]
     tags: Vec<String>,
+
+    /// タグデータベースのパスを指定 (環境変数 SMART_TAGS_DB でも設定可)
+    #[arg(
+        long, 
+        value_name = "DB_PATH", 
+        env = "SMART_TAGS_DB",      // 環境変数を読みに行く
+        default_value = "tags_db.json" // デフォルトはカレントディレクトリ
+    )]
+    db: PathBuf,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let md_path = &cli.path;
+    let db_path = &cli.db; // 引数からパスを取得
 
-    // 1. タグ辞書 (JSON) をロード
-    let mut config = load_config(DB_FILENAME)?;
+    // 1. 指定されたパスからロード
+    let mut config = load_config(db_path)?;
 
-    // 2. 入力されたタグを1つずつ解決（正規化 or 学習）
     let mut resolved_tags = Vec::new();
     let mut config_updated = false;
+
+    println!("Using DB: {:?}", db_path); // 現在どのDBを使っているか表示
 
     println!("Checking tags...");
     for raw_tag in &cli.tags {
@@ -55,56 +63,47 @@ fn main() -> Result<()> {
         }
     }
 
-    // 3. 辞書に変更があれば保存
+    // 2. 指定されたパスへ保存
     if config_updated {
-        save_config(DB_FILENAME, &config)?;
-        println!("✨ Tag database updated.");
+        save_config(db_path, &config)?;
+        println!("✨ Tag database updated at {:?}", db_path);
     }
 
-    // 4. Markdownファイルを更新
+    // 3. Markdownファイルを更新
     update_markdown(md_path, &resolved_tags)?;
 
     println!("✅ Successfully added tags to {:?}: {:?}", md_path, resolved_tags);
     Ok(())
 }
 
-// --- ロジック: タグ解決・対話 ---
+// --- ロジック: タグ解決 (変更なし) ---
 fn resolve_tag(input: &str, config: &mut TagConfig) -> Result<(String, bool)> {
-    // A. 完全一致 (名前 or エイリアス) チェック
+    // 省略 (前回のコードと同じ)
+    // A. 完全一致
     for entry in &config.tags {
         if entry.name == input || entry.aliases.iter().any(|a| a == input) {
-            // 既に知っているタグなら、正規名(name)を返す
             if entry.name != input {
                 println!("   Mapping '{}' -> '{}'", input, entry.name);
             }
             return Ok((entry.name.clone(), false));
         }
     }
-
-    // B. あいまい検索 (類似度判定)
-    // 距離が 3 以下のものを候補とする
+    // B. あいまい検索
     let suggestions: Vec<(usize, usize)> = config.tags.iter().enumerate()
         .map(|(i, t)| (i, levenshtein(&t.name, input)))
-        .filter(|(_, dist)| *dist <= 3) // 閾値: 3文字以内の違い
+        .filter(|(_, dist)| *dist <= 3)
         .collect();
 
-    // 候補が見つかった場合、ユーザーに聞く
     if !suggestions.is_empty() {
         println!("Tag '{}' is unknown.", input);
-        
         let mut selections = Vec::new();
-        // 選択肢の作成
         for (idx, _dist) in &suggestions {
             let tag_name = &config.tags[*idx].name;
             selections.push(format!("Use existing '{}' (Typo correction)", tag_name));
         }
-        // エイリアス登録の選択肢
-        // 一番近い候補（先頭）をデフォルトのエイリアス先に提案
         let best_match_idx = suggestions[0].0;
         let best_match_name = config.tags[best_match_idx].name.clone();
         selections.push(format!("Register '{}' as alias for '{}'", input, best_match_name));
-        
-        // 新規作成
         selections.push(format!("Create new tag '{}'", input));
 
         let selection = Select::new()
@@ -114,20 +113,15 @@ fn resolve_tag(input: &str, config: &mut TagConfig) -> Result<(String, bool)> {
             .interact()?;
 
         if selection < suggestions.len() {
-            // 1. 既存タグとして使う (一時的修正)
             let target_idx = suggestions[selection].0;
             return Ok((config.tags[target_idx].name.clone(), false));
         } else if selection == suggestions.len() {
-            // 2. エイリアスとして登録
             config.tags[best_match_idx].aliases.push(input.to_string());
             return Ok((best_match_name.clone(), true));
-        } else {
-            // 3. 新規作成へ
-            // 下のフローへ流す
         }
     }
 
-    // C. 新規登録フロー (類似なし or ユーザーが新規選択)
+    // C. 新規登録
     let confirm = Confirm::new()
         .with_prompt(format!("Register new tag '{}' to database?", input))
         .default(true)
@@ -140,29 +134,39 @@ fn resolve_tag(input: &str, config: &mut TagConfig) -> Result<(String, bool)> {
         });
         Ok((input.to_string(), true))
     } else {
-        // 登録拒否された場合でもファイルには書く場合
         Ok((input.to_string(), false))
     }
 }
 
-// --- ロジック: 設定ファイル I/O ---
-fn load_config(path: &str) -> Result<TagConfig> {
-    if !Path::new(path).exists() {
+// --- I/O周りの修正: PathBufを受け取るように変更 ---
+
+fn load_config(path: &Path) -> Result<TagConfig> {
+    if !path.exists() {
         return Ok(TagConfig::default());
     }
-    let content = fs::read_to_string(path)?;
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read DB file: {:?}", path))?;
     let config = serde_json::from_str(&content).unwrap_or_default();
     Ok(config)
 }
 
-fn save_config(path: &str, config: &TagConfig) -> Result<()> {
+fn save_config(path: &Path, config: &TagConfig) -> Result<()> {
+    // 親ディレクトリが存在しない場合は作成する（親切設計）
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+
     let content = serde_json::to_string_pretty(config)?;
-    fs::write(path, content)?;
+    fs::write(path, content)
+        .with_context(|| format!("Failed to write DB file: {:?}", path))?;
     Ok(())
 }
 
-// --- ロジック: Markdown更新 (前回と同じ堅牢な実装) ---
+// --- Markdown更新 (変更なし) ---
 fn update_markdown(path: &PathBuf, new_tags: &[String]) -> Result<()> {
+    // 省略 (前回のコードと同じ)
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read {:?}", path))?;
 
@@ -186,7 +190,6 @@ fn update_markdown(path: &PathBuf, new_tags: &[String]) -> Result<()> {
 
     let tags_val = mapping.get_mut(&tags_key).unwrap();
 
-    // 文字列なら配列へ昇格
     if tags_val.is_string() {
         let s = tags_val.as_str().unwrap().to_string();
         *tags_val = Value::Sequence(vec![Value::String(s)]);
