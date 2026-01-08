@@ -161,10 +161,10 @@ fn load_config(path: &Path) -> Result<TagConfig> {
 
 fn save_config(path: &Path, config: &TagConfig) -> Result<()> {
     // 親ディレクトリが存在しない場合は作成する（親切設計）
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)?;
     }
 
     let content = serde_json::to_string_pretty(config)?;
