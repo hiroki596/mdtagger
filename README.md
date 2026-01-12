@@ -79,7 +79,7 @@ mdtagger memo.md python --db ./my_project_tags.json
 
 ```bash
 # 自分のホームディレクトリ配下にDBを置く例
-export mdtagger_DB="$HOME/.config/mdtagger/db.json"
+export MDTAGGER_DB="$HOME/.config/mdtagger/db.json"
 ```
 
 設定後、シェルを再読み込みするかターミナルを再起動してください。
