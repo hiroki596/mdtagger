@@ -31,11 +31,11 @@ struct Cli {
     #[arg(value_name = "TAGS", num_args = 1..)]
     tags: Vec<String>,
 
-    /// タグデータベースのパスを指定 (環境変数 SMART_TAGS_DB でも設定可)
+    /// タグデータベースのパスを指定 (環境変数 MDTAGGER_DB でも設定可)
     #[arg(
         long,
         value_name = "DB_PATH", 
-        env = "SMART_TAGS_DB",      // 環境変数を読みに行く
+        env = "MDTAGGER_DB",      // 環境変数を読みに行く
         default_value = "tags_db.json" // デフォルトはカレントディレクトリ
     )]
     db: PathBuf,

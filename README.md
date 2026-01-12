@@ -44,12 +44,12 @@ copy target\release\mdtagger.exe C:\Windows\System32\
 ### 基本コマンド
 
 ```bash
-smart_tags <ファイルパス> <タグ1> <タグ2> ...
+mdtagger <ファイルパス> <タグ1> <タグ2> ...
 ```
 
 **例:**
 ```bash
-smart_tags memo.md rust cli
+mdtagger memo.md rust cli
 ```
 → `memo.md` の `tags` に `rust` と `cli` が追加されます。
 
@@ -58,7 +58,7 @@ smart_tags memo.md rust cli
 * `-d`, `--db <PATH>`: タグデータベース（JSON）のパスを一時的に指定します。
 
 ```bash
-smart_tags memo.md python --db ./my_project_tags.json
+mdtagger memo.md python --db ./my_project_tags.json
 ```
 
 ---
@@ -68,7 +68,7 @@ smart_tags memo.md python --db ./my_project_tags.json
 タグの辞書データ（`tags_db.json`）の保存場所は、以下の優先順位で決定されます。
 
 1.  **コマンドライン引数**: `--db /path/to/db.json`
-2.  **環境変数**: `SMART_TAGS_DB`
+2.  **環境変数**: `MDTAGGER_DB`
 3.  **デフォルト**: カレントディレクトリの `tags_db.json`
 
 ### 推奨設定（環境変数）
@@ -79,7 +79,7 @@ smart_tags memo.md python --db ./my_project_tags.json
 
 ```bash
 # 自分のホームディレクトリ配下にDBを置く例
-export SMART_TAGS_DB="$HOME/.config/smart_tags/db.json"
+export mdtagger_DB="$HOME/.config/mdtagger/db.json"
 ```
 
 設定後、シェルを再読み込みするかターミナルを再起動してください。
@@ -93,7 +93,7 @@ export SMART_TAGS_DB="$HOME/.config/smart_tags/db.json"
 
 **入力:**
 ```bash
-smart_tags note.md rs
+mdtagger note.md rs
 ```
 （`rs` は未登録、`rust` は登録済みの場合）
 
